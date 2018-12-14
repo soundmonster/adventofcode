@@ -1,7 +1,5 @@
 #!/usr/bin/env elixir
 
-# "input.txt" |> File.read! |> String.split |> Enum.map(&String.to_integer/1) |> Enum.sum |> IO.puts
-
 "input.txt"
 |> File.stream!([], :line)
 |> Stream.map(&String.trim/1)
