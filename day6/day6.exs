@@ -23,11 +23,29 @@ defmodule Grid do
   end
 
   def voronoi(%Grid{} = grid) do
+    %Grid{grid | coords: partition(grid)}
+  end
 
+  def partition(%Grid{} = grid, extent \\ 0) do
+    grid
+    |> all_coordinates(extent)
+    |> Enum.reduce(grid.coords, fn coord, acc ->
+      Map.put(acc, coord, closest(grid, coord))
+    end)
   end
 
   def closest(%Grid{} = grid, {x, y}) do
-
+    grid.points
+    |> Enum.map(fn {coords, name} ->
+      {name, manhattan(coords, {x,y})}
+    end)
+    |> Enum.group_by(fn {_, distance} -> distance end, fn {name, _} -> name end)
+    |> Enum.sort_by(fn {distance, _} -> distance end)
+    |> hd
+    |> case do
+      {_distance, [name]} -> name
+      _ -> "."
+    end
   end
 
   def populate_points(%Grid{points: ps, coords: coords} = grid) do
@@ -54,6 +72,66 @@ defmodule Grid do
       right: Enum.max(xs),
       bottom: Enum.max(ys)
     ]
+  end
+
+  def all_coordinates(%Grid{
+    top: top,
+    left: left,
+    right: right,
+    bottom: bottom},
+    extent \\ 0) do
+    for i <- (left-extent)..(right+extent), j <- (top-extent)..(bottom+extent) do
+      {i, j}
+    end
+  end
+
+  def areas(cells) do
+    cells
+    |> Enum.reduce(%{}, fn {coords,_name}, acc ->
+      Map.update(acc, coords, 1, &(&1 + 1))
+    end)
+  end
+
+  def count_cells(cells) do
+    cells
+    |> Enum.group_by(fn {_, name} -> name end)
+    |> Enum.map(fn {name, cells} -> {name, length(cells)} end)
+    |> Enum.into(%{})
+  end
+
+  def finite_areas(%Grid{} = grid) do
+    partition_fit = grid
+      |> partition(0)
+      |> count_cells()
+    partition_loose = grid
+      |> partition(1)
+      |> count_cells()
+
+    partition_fit
+    |> Map.merge(partition_loose, fn _k, v1, v2 ->
+      v1 == v2 && v1 || nil
+    end)
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    |> Enum.into(%{})
+  end
+
+  def region(%Grid{} = grid, threshold \\ 10_000) do
+    newcells = grid
+      |> all_coordinates()
+      |> Enum.reduce(grid.coords, fn coord, acc ->
+        Map.put(acc, coord, remoteness(grid, coord, threshold))
+      end)
+
+    %Grid{grid | coords: newcells}
+  end
+
+  def remoteness(%Grid{points: ps}, {x,y}, threshold) do
+    dist = ps
+    |> Enum.map(fn {cell, _} -> cell end)
+    |> Enum.map(&manhattan(&1, {x,y}))
+    |> Enum.sum()
+
+    dist < threshold && "#" || "."
   end
 
   def print(%Grid{} = g) do
@@ -94,12 +172,22 @@ defmodule Day6 do
     input()
     |> Grid.new()
     |> Grid.populate_points()
-    |> Grid.voronoi()
+    |> Grid.finite_areas()
+    |> Enum.map(fn {_name, count} -> count end)
+    |> Enum.max()
   end
 
   def puzzle2 do
+    g = input()
+    |> Grid.new()
+    |> Grid.populate_points()
+    |> Grid.region()
+
+    g.coords
+    |> Map.values()
+    |> Enum.count(fn s -> s == "#" end)
   end
 end
 
 Day6.puzzle1() |> IO.inspect()
-# Day6.puzzle2() |> IO.inspect(label: :puzzle2)
+Day6.puzzle2() |> IO.inspect
