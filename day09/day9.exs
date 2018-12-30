@@ -135,7 +135,7 @@ defmodule Game do
     next = from - offset
 
     if next < 0 do
-      total - next
+      total + next
     else
       next
     end
@@ -148,7 +148,7 @@ defmodule Day9 do
 
   def puzzle1 do
     0..300
-    |> Enum.reduce(Game.new(9), fn _, game ->
+    |> Enum.reduce(Game.new(300), fn _, game ->
       game
       |> Game.inspect()
       |> Game.turn()
