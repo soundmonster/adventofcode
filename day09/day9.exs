@@ -23,7 +23,7 @@ defmodule Game do
     }
   end
 
-  def turn(%Game{turn: -1, players: players} = game) do
+  def turn(%Game{turn: -1} = game) do
     %Game{
       game
       | circle: [0, 1],
@@ -89,7 +89,7 @@ defmodule Game do
     {score_marble, circle} = List.pop_at(game.circle, next_marble_index)
     turn = game.turn + 1
     current_player = rem(turn, game.players) + 1
-    scores = update_scores(game.scores, current_player, m + score_marble)
+    scores = update_scores(game.scores, current_player, score_marble, m)
 
     %Game{
       game
@@ -102,8 +102,14 @@ defmodule Game do
     }
   end
 
-  def update_scores(scores, player, increment) do
-    Map.update(scores, player, increment, &(&1 + increment))
+  def update_scores(scores, player, removed_marble, kept_marble) do
+    increment = kept_marble + removed_marble
+    Map.update(scores, player, increment, &(increment + &1))
+  end
+
+  def high_score(%Game{scores: scores}) do
+    scores
+    |> Enum.max_by(fn {_, score} -> score end)
   end
 
   def inspect(game) do
@@ -144,15 +150,41 @@ end
 
 defmodule Day9 do
   def input do
+    %{players: 435, last_marble: 71184}
+  end
+
+  def input_example_1 do
+    %{players: 10, last_marble: 1618}
   end
 
   def puzzle1 do
-    0..300
-    |> Enum.reduce(Game.new(300), fn _, game ->
+    %{players: players, last_marble: last_marble} = input()
+
+    0..last_marble
+    |> Enum.reduce(Game.new(players), fn turn, game ->
+      if rem(turn, 1000) == 0 do
+        IO.puts("#{turn}  ")
+      end
+
       game
-      |> Game.inspect()
       |> Game.turn()
     end)
+    |> Game.high_score()
+
+    # Stream.resource(
+    #   fn -> Game.new(players) end,
+    #   fn game ->
+    #     game = game |> Game.turn()
+
+    #     if rem(game.turn, 1000) == 0 do
+    #       IO.puts("#{game.turn}  ")
+    #     end
+
+    #     {[game], game}
+    #   end,
+    #   fn _ -> :ok end
+    # )
+    # |> Enum.find(fn game -> Game.high_score?(game, last_marble) end)
   end
 
   def puzzle2 do
