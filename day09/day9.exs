@@ -7,17 +7,15 @@ defmodule Game do
     :next_marble,
     :players,
     :current_player,
-    :current_marble_index,
     :scores
   ]
 
   def new(players) when players > 0 do
     %Game{
-      circle: [0],
+      circle: Circle.from_list([0], 0),
       turn: -1,
       players: players,
       current_player: "-",
-      current_marble_index: 0,
       next_marble: 1,
       scores: %{}
     }
@@ -26,9 +24,8 @@ defmodule Game do
   def turn(%Game{turn: -1} = game) do
     %Game{
       game
-      | circle: [0, 1],
+      | circle: Circle.from_list([0, 1], 1),
         turn: 0,
-        current_marble_index: 1,
         current_player: 1,
         next_marble: 2
     }
@@ -37,9 +34,8 @@ defmodule Game do
   def turn(%Game{turn: 0, players: players} = game) do
     %Game{
       game
-      | circle: [0, 2, 1],
+      | circle: Circle.from_list([0, 2, 1], 1),
         turn: 1,
-        current_marble_index: 1,
         current_player: rem(1, players) + 1,
         next_marble: 3
     }
@@ -48,23 +44,19 @@ defmodule Game do
   def turn(%Game{turn: 1, players: players} = game) do
     %Game{
       game
-      | circle: [0, 2, 1, 3],
+      | circle: Circle.from_list([0, 2, 1, 3], 3),
         turn: 2,
-        current_marble_index: 3,
         current_player: rem(2, players) + 1,
         next_marble: 4
     }
   end
 
   def turn(%{next_marble: m} = game) when rem(m, 23) != 0 do
-    next_marble_index =
-      clockwise(
-        length(game.circle),
-        game.current_marble_index,
-        2
-      )
+    circle =
+      game.circle
+      |> Circle.rotate(2)
+      |> Circle.place(m)
 
-    circle = List.insert_at(game.circle, next_marble_index, m)
     turn = game.turn + 1
     current_player = rem(turn, game.players) + 1
 
@@ -72,21 +64,17 @@ defmodule Game do
       game
       | next_marble: m + 1,
         turn: turn,
-        current_marble_index: next_marble_index,
         circle: circle,
         current_player: current_player
     }
   end
 
   def turn(%{next_marble: m} = game) when rem(m, 23) == 0 do
-    next_marble_index =
-      counterclockwise(
-        length(game.circle),
-        game.current_marble_index,
-        7
-      )
+    {score_marble, circle} =
+      game.circle
+      |> Circle.rotate(-7)
+      |> Circle.pop()
 
-    {score_marble, circle} = List.pop_at(game.circle, next_marble_index)
     turn = game.turn + 1
     current_player = rem(turn, game.players) + 1
     scores = update_scores(game.scores, current_player, score_marble, m)
@@ -95,7 +83,6 @@ defmodule Game do
       game
       | next_marble: m + 1,
         turn: turn,
-        current_marble_index: next_marble_index,
         circle: circle,
         current_player: current_player,
         scores: scores
@@ -113,17 +100,7 @@ defmodule Game do
   end
 
   def inspect(game) do
-    game.circle
-    |> Enum.with_index()
-    |> Enum.reduce("[#{game.current_player}]", fn {marble, position}, output ->
-      if position == game.current_marble_index do
-        output <> " (#{marble}) "
-      else
-        output <> "  #{marble} "
-      end
-    end)
-    |> IO.puts()
-
+    ("[#{game.current_player}]" <> Circle.inspect(game.circle)) |> IO.puts()
     game
   end
 
@@ -146,6 +123,60 @@ defmodule Game do
       next
     end
   end
+
+  def get_winner(%Game{scores: scores}) do
+    scores |> Enum.max_by(fn {_, v} -> v end)
+  end
+end
+
+defmodule Circle do
+  defstruct [:circle]
+
+  def new() do
+    %Circle{circle: :queue.from_list([0])}
+  end
+
+  def from_list(list, position) do
+    %Circle{circle: :queue.from_list(list)}
+    |> rotate(position)
+  end
+
+  def rotate(%Circle{} = circle, 0), do: circle
+
+  def rotate(%Circle{circle: queue}, offset) when offset > 0 do
+    {{:value, item}, queue} = :queue.out_r(queue)
+    queue = :queue.in_r(item, queue)
+    rotate(%Circle{circle: queue}, offset - 1)
+  end
+
+  def rotate(%Circle{circle: queue}, offset) when offset < 0 do
+    {{:value, item}, queue} = :queue.out(queue)
+    queue = :queue.in(item, queue)
+    rotate(%Circle{circle: queue}, offset + 1)
+  end
+
+  def place(%Circle{circle: queue}, marble) do
+    %Circle{circle: :queue.in_r(marble, queue)}
+  end
+
+  def pop(%Circle{circle: queue}) do
+    {{:value, item}, queue} = :queue.out(queue)
+
+    {item, %Circle{circle: queue}}
+  end
+
+  def inspect(%Circle{circle: queue}) do
+    queue
+    |> :queue.to_list()
+    |> Enum.with_index()
+    |> Enum.reduce("", fn {marble, index}, output ->
+      if index == 0 do
+        output <> " (#{marble}) "
+      else
+        output <> "  #{marble} "
+      end
+    end)
+  end
 end
 
 defmodule Day9 do
@@ -155,6 +186,10 @@ defmodule Day9 do
 
   def input_example_1 do
     %{players: 10, last_marble: 1618}
+  end
+
+  def input_example_2 do
+    %{players: 300, last_marble: 30}
   end
 
   def puzzle1 do
@@ -170,26 +205,22 @@ defmodule Day9 do
       |> Game.turn()
     end)
     |> Game.high_score()
-
-    # Stream.resource(
-    #   fn -> Game.new(players) end,
-    #   fn game ->
-    #     game = game |> Game.turn()
-
-    #     if rem(game.turn, 1000) == 0 do
-    #       IO.puts("#{game.turn}  ")
-    #     end
-
-    #     {[game], game}
-    #   end,
-    #   fn _ -> :ok end
-    # )
-    # |> Enum.find(fn game -> Game.high_score?(game, last_marble) end)
   end
 
   def puzzle2 do
+    0..7_118_400
+    |> Enum.reduce(Game.new(435), fn i, game ->
+      if rem(i, 1_000_000) == 0, do: IO.puts(i)
+
+      game
+      # |> Game.inspect()
+      |> Game.turn()
+    end)
+    |> Map.from_struct()
+    |> Map.get(:scores)
+    |> Map.get(280)
   end
 end
 
 Day9.puzzle1() |> IO.inspect(label: :puzzle1)
-Day9.puzzle2() |> IO.inspect(label: :puzzle2)
+# Day9.puzzle2() |> IO.inspect(label: :puzzle2)
