@@ -84,26 +84,6 @@ defmodule Game do
     game
   end
 
-  def clockwise(total, from, offset) do
-    next = from + offset
-
-    if next == total do
-      next
-    else
-      rem(next, total)
-    end
-  end
-
-  def counterclockwise(total, from, offset) do
-    next = from - offset
-
-    if next < 0 do
-      total + next
-    else
-      next
-    end
-  end
-
   def get_winner(%Game{scores: scores}) do
     scores |> Enum.max_by(fn {_, v} -> v end)
   end
@@ -161,16 +141,10 @@ defmodule Circle do
 
     s =
       queue
-      |> rotate_queue(position)
       |> :queue.to_list()
       |> Enum.with_index()
       |> Enum.reduce("", fn {marble, index}, output ->
-        if index == norm_pos do
-          # if index == 0 do
-          output <> "(#{marble})"
-        else
-          output <> " #{marble} "
-        end
+        output <> " #{marble} "
       end)
 
     s <> "  :: #{norm_pos} : #{position} : #{total}"
@@ -191,7 +165,7 @@ defmodule Day9 do
   end
 
   def puzzle1 do
-    %{players: players, last_marble: last_marble} = input_example_2()
+    %{players: players, last_marble: last_marble} = input()
 
     0..last_marble
     |> Enum.reduce(Game.new(players), fn turn, game ->
@@ -200,26 +174,25 @@ defmodule Day9 do
       end
 
       game
-      |> Game.inspect()
+      # |> Game.inspect()
       |> Game.turn()
     end)
     |> Game.high_score()
   end
 
   def puzzle2 do
-    0..7_118_400
+    %{players: players, last_marble: last_marble} = input()
+
+    0..(last_marble * 100)
     |> Enum.reduce(Game.new(435), fn i, game ->
       if rem(i, 1_000_000) == 0, do: IO.puts(i)
 
       game
-      # |> Game.inspect()
       |> Game.turn()
     end)
-    |> Map.from_struct()
-    |> Map.get(:scores)
-    |> Map.get(280)
+    |> Game.high_score()
   end
 end
 
 Day9.puzzle1() |> IO.inspect(label: :puzzle1)
-# Day9.puzzle2() |> IO.inspect(label: :puzzle2)
+Day9.puzzle2() |> IO.inspect(label: :puzzle2)
