@@ -89,6 +89,15 @@ defmodule Day10 do
   end
 
   def puzzle1 do
+    converging_sky() |> Sky.print()
+  end
+
+  def puzzle2 do
+    %{seconds_elapsed: res} = converging_sky()
+    res
+  end
+
+  def converging_sky do
     Stream.resource(
       fn -> input() |> Sky.new() end,
       fn sky ->
@@ -106,10 +115,6 @@ defmodule Day10 do
     |> hd
     |> hd
     |> elem(0)
-    |> Sky.print()
-  end
-
-  def puzzle2 do
   end
 end
 
