@@ -7,6 +7,8 @@ defmodule Grid do
         value_at(x, y, ser)
       end
     end
+    |> List.flatten()
+    |> :array.from_list()
   end
 
   def value_at(x, y, ser \\ 7857) do
@@ -28,30 +30,41 @@ defmodule Grid do
   end
 
   def subgrids(grid, size \\ 3) do
-    for y <- 0..(length(grid) - size - 1), x <- 0..(length(hd(grid)) - size - 1) do
+    for y <- 0..(299 - size),
+        x <- 0..(299 - size) do
       {x + 1, y + 1, grid_sum(grid, x, y, size)}
     end
   end
 
   def all_size_subgrids(grid) do
-    for size <- 1..length(grid) do
-      for y <- 0..(length(grid) - size - 1),
-          x <- 0..(length(hd(grid)) - size - 1) do
-        {x + 1, y + 1, size, grid_sum(grid, x, y, size)}
-      end
+    for size <- 1..:array.size(grid),
+        y <- 0..(299 - size),
+        x <- 0..(299 - size) do
+      {x + 1, y + 1, size, grid_sum(grid, x, y, size)}
 
-      IO.write("#{size}")
+      if x == 0 && y == 0 do
+        IO.puts("#{size}")
+      end
     end
   end
 
   def grid_sum(grid, x, y, size \\ 3) do
-    grid
-    |> Enum.drop(y)
-    |> Enum.take(size)
-    |> Enum.map(fn line ->
-      line |> Enum.drop(x) |> Enum.take(size) |> Enum.sum()
+    y..(y + size)
+    |> Enum.reduce(0, fn j, acc ->
+      acc +
+        (x..(x + size)
+         |> Enum.reduce(0, fn i, acc ->
+           acc + :array.get(j * 300 + i, grid)
+         end))
     end)
-    |> Enum.sum()
+
+    # grid
+    # |> Enum.drop(y)
+    # |> Enum.take(size)
+    # |> Enum.map(fn line ->
+    #   line |> Enum.drop(x) |> Enum.take(size) |> Enum.sum()
+    # end)
+    # |> Enum.sum()
   end
 end
 
